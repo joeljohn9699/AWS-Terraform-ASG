@@ -61,25 +61,26 @@ resource "aws_security_group" "project3-sg1" {
   tags = {
     "Description" = "Project3 SecurityGroup1 for Ports 22|80"
   }
+  vpc_id = var.default_vpc_id
   
 }
 
 resource "aws_launch_template" "project3_lt1" {
   name_prefix = "Project3-LaunchTemplate1"
-  description = "Project3 LaunchTemplate1"
-  image_id = var.image_id
+  description = "Launch template for Auto scaling group managed by terraform."
+  image_id = var.ami_id
   instance_type = "t2.micro"
   key_name = aws_key_pair.project3_launchtemplate_key.key_name
   tags = {
-    "Name" = "Project3 LaunchTemplate1"
+    "Name" = "Project3 LaunchTemplate1-TF"
   }
-  user_data = "${file("nginx_data.sh")}"
+  user_data = "${filebase64("nginx_data.sh")}"
   vpc_security_group_ids = [ aws_security_group.project3-sg1.id ]
 
 }
 
 resource "aws_lb" "project3_lb1" {
-  # internal = false
+  internal = false
   ip_address_type = "ipv4"
   # load_balancer_type = "application"
   name_prefix = "tf-lb1"
@@ -94,11 +95,16 @@ resource "aws_lb" "project3_lb1" {
 
 resource "aws_lb_target_group" "project3_lb1_target_group" {
   health_check {
+    # enabled = true
+    # interval = 30
     matcher = "200"
     path = "/"
+    # port = "traffic-port"
+    # protocol = "HTTP"
   }
   name_prefix = "tf-tg1"
   port = 80
+  protocol_version = "HTTP1"
   protocol = "HTTP"
   tags = {
     "Description" = "Project3-LoadBalancer1_TargetGroup-TF"
@@ -116,12 +122,15 @@ resource "aws_lb_listener" "project3_lb1_listener" {
   }
   load_balancer_arn = aws_lb.project3_lb1.arn
   port = 80
-  # protocol = "HTTP"
+  protocol = "HTTP"
+  tags = {
+    "Description" = "AWS load balancer listener created using terraform for project 3"
+  }
   
 }
 
 resource "aws_autoscaling_group" "project3_asg1" {
-  name_prefix = "Project 3 AutoScalingGroup"
+  name_prefix = "Project3AutoScalingGroup"
   max_size = 2
   min_size = 1
   desired_capacity = 1
@@ -132,6 +141,6 @@ resource "aws_autoscaling_group" "project3_asg1" {
   health_check_grace_period = 30
   health_check_type = "ELB"
   vpc_zone_identifier = var.default_subnet_ids
-  target_group_arns = [ aws_lb.project3_lb1.arn ]
+  target_group_arns = [ aws_lb_target_group.project3_lb1_target_group.arn ]
   
 }
